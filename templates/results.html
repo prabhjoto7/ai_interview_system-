@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Interview Results</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    header {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      border: 2px solid #00d4ff;
+      margin-bottom: 30px;
+    }
+    
+    h1 {
+      color: #00d4ff;
+      font-size: 2.5em;
+      margin-bottom: 15px;
+    }
+    
+    .decision-box {
+      padding: 30px;
+      border-radius: 10px;
+      margin: 30px 0;
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
+      border: 3px solid;
+    }
+    
+    .decision-hire {
+      background: rgba(40, 167, 69, 0.2);
+      border-color: #28a745;
+      color: #28a745;
+    }
+    
+    .decision-maybe {
+      background: rgba(255, 193, 7, 0.2);
+      border-color: #ffc107;
+      color: #ffc107;
+    }
+    
+    .decision-no {
+      background: rgba(255, 68, 68, 0.2);
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+    
+    .decision-disqualified {
+      background: rgba(139, 0, 0, 0.3);
+      border-color: #8b0000;
+      color: #ff6666;
+    }
+    
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 30px 0;
+    }
+    
+    .metric-card {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 25px;
+      border-radius: 10px;
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      text-align: center;
+    }
+    
+    .metric-value {
+      font-size: 3em;
+      font-weight: bold;
+      color: #00d4ff;
+      margin: 10px 0;
+    }
+    
+    .metric-label {
+      font-size: 1.1em;
+      color: #aaa;
+    }
+    
+    .section {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 30px;
+      border-radius: 10px;
+      border: 2px solid rgba(0, 212, 255, 0.3);
+      margin: 20px 0;
+    }
+    
+    .section h2 {
+      color: #00d4ff;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+    }
+    
+    .question-result {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #00d4ff;
+    }
+    
+    .question-result h3 {
+      color: #00d4ff;
+      margin-bottom: 10px;
+    }
+    
+    .transcript {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 15px;
+      border-radius: 5px;
+      margin: 10px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      line-height: 1.6;
+    }
+    
+    .reasons-list {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .reasons-list li {
+      padding: 10px;
+      margin: 10px 0;
+      background: rgba(0, 212, 255, 0.1);
+      border-radius: 5px;
+      border-left: 4px solid #00d4ff;
+    }
+    
+    .violations-section {
+      background: rgba(255, 68, 68, 0.2);
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid #ff4444;
+      margin: 20px 0;
+    }
+    
+    .violations-section h3 {
+      color: #ff4444;
+      margin-bottom: 15px;
+    }
+    
+    .btn {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      background: #00d4ff;
+      color: #000;
+      margin: 10px;
+      transition: all 0.3s;
+    }
+    
+    .btn:hover {
+      background: #00b8e6;
+      transform: scale(1.05);
+    }
+    
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .stat-label {
+      color: #aaa;
+    }
+    
+    .stat-value {
+      color: #00d4ff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 Interview Results</h1>
+      <p>Session ID: {{ session.session_id }}</p>
+      <p>Duration: {{ "%.1f"|format(session.duration / 60) }} minutes</p>
+    </header>
+    
+    <!-- Decision Box -->
+    {% if 'Strong Hire' in analysis.decision or 'Hire' in analysis.decision %}
+    <div class="decision-box decision-hire">
+      ✅ {{ analysis.decision }}
+    </div>
+    {% elif 'Maybe' in analysis.decision %}
+    <div class="decision-box decision-maybe">
+      ⚠️ {{ analysis.decision }}
+    </div>
+    {% elif 'Disqualified' in analysis.decision %}
+    <div class="decision-box decision-disqualified">
+      ❌ {{ analysis.decision }}
+    </div>
+    {% else %}
+    <div class="decision-box decision-no">
+      ❌ {{ analysis.decision }}
+    </div>
+    {% endif %}
+    
+    <!-- Overall Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Overall Score</div>
+        <div class="metric-value">{{ "%.1f"|format(analysis.overall_score) }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Confidence</div>
+        <div class="metric-value">{{ "%.1f"|format(analysis.confidence) }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Fluency (WPM)</div>
+        <div class="metric-value">{{ "%.0f"|format(analysis.fluency) }}</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Answer Accuracy</div>
+        <div class="metric-value">{{ "%.1f"|format(analysis.answer_accuracy) }}%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Integrity Score</div>
+        <div class="metric-value">{{ analysis.integrity_score }}%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Violations</div>
+        <div class="metric-value">{{ session.total_violations }}</div>
+      </div>
+    </div>
+    
+    <!-- Additional Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Eye Contact</div>
+        <div class="metric-value">{{ "%.1f"|format(analysis.eye_contact_percentage) }}%</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Blink Rate</div>
+        <div class="metric-value">{{ "%.1f"|format(analysis.blink_rate) }}/min</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Tab Switches</div>
+        <div class="metric-value">{{ session.tab_switches }}</div>
+      </div>
+    </div>
+    
+    <!-- Reasons -->
+    <div class="section">
+      <h2>📋 Decision Factors</h2>
+      <ul class="reasons-list">
+        {% for reason in analysis.reasons %}
+        <li>{{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    
+    <!-- Session Summary -->
+    <div class="section">
+      <h2>📈 Session Summary</h2>
+      <div class="stat-row">
+        <span class="stat-label">Status:</span>
+        <span class="stat-value">{{ session.status|upper }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Questions Answered:</span>
+        <span class="stat-value">{{ session.questions_answered }} / 3</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Total Frames Captured:</span>
+        <span class="stat-value">{{ session.metadata.total_frames }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Frames with Face:</span>
+        <span class="stat-value">{{ session.metadata.frames_with_face }}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Face Detection Rate:</span>
+        <span class="stat-value">
+          {{ "%.1f"|format((session.metadata.frames_with_face / session.metadata.total_frames * 100) if session.metadata.total_frames > 0 else 0) }}%
+        </span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Total Blinks:</span>
+        <span class="stat-value">{{ session.blink_count }}</span>
+      </div>
+    </div>
+    
+    <!-- Violations -->
+    {% if session.total_violations > 0 %}
+    <div class="violations-section">
+      <h3>⚠️ Integrity Violations Detected</h3>
+      <p>Total: {{ session.total_violations }} violation(s)</p>
+      {% if session.tab_switches > 0 %}
+      <p style="margin-top: 10px;">• Tab switches: {{ session.tab_switches }}</p>
+      {% endif %}
+      <p style="margin-top: 10px; color: #ffaaaa;">
+        Note: Multiple violations may result in disqualification
+      </p>
+    </div>
+    {% endif %}
+    
+    <!-- Question Results -->
+    <div class="section">
+      <h2>📝 Question Analysis</h2>
+      {% for q in analysis.questions %}
+      <div class="question-result">
+        <h3>Question {{ loop.index }}: {{ q.question }}</h3>
+        
+        {% if q.transcript %}
+        <div class="transcript">
+          <strong>Transcript:</strong><br>
+          {{ q.transcript if q.transcript else 'No transcript available' }}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 15px;">
+          {% if q.metrics.accuracy %}
+          <div class="stat-row">
+            <span class="stat-label">Answer Accuracy:</span>
+            <span class="stat-value">{{ "%.1f"|format(q.metrics.accuracy) }}%</span>
+          </div>
+          {% endif %}
+          
+          {% if q.metrics.wpm %}
+          <div class="stat-row">
+            <span class="stat-label">Speaking Rate:</span>
+            <span class="stat-value">{{ "%.0f"|format(q.metrics.wpm) }} WPM</span>
+          </div>
+          {% endif %}
+          
+          {% if q.metrics.word_count %}
+          <div class="stat-row">
+            <span class="stat-label">Word Count:</span>
+            <span class="stat-value">{{ q.metrics.word_count }}</span>
+          </div>
+          {% endif %}
+          
+          {% if q.voice_emotion %}
+          <div class="stat-row">
+            <span class="stat-label">Voice Emotion:</span>
+            <span class="stat-value">{{ q.voice_emotion.emotion }} ({{ "%.0f"|format(q.voice_emotion.confidence * 100) }}%)</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Analysis Method:</span>
+            <span class="stat-value">{{ q.voice_emotion.method }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    
+    <!-- Actions -->
+    <div style="text-align: center; margin: 40px 0;">
+      <button class="btn" onclick="window.print()">🖨️ Print Report</button>
+      <button class="btn" onclick="window.location.href='/'">🔄 New Interview</button>
+    </div>
+  </div>
+</body>
+</html>
