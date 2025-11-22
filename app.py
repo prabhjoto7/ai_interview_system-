@@ -14,8 +14,8 @@ import cv2
 from datetime import datetime
 from pathlib import Path
 import threading
-from queue import Queue
 
+from queue import Queue
 # AI/ML Imports
 try:
     from deepface import DeepFace
