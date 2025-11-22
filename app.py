@@ -407,7 +407,8 @@ class InterviewSession:
         self.current_question = 0
         self.answers = []
         self.integrity_score = 100
-        self.status = 'active'  # active, paused, completed, terminated
+        self.status = 'active' 
+        self.tab_switches = 0 # active, paused, completed, terminated
         self.metadata = {
             'total_frames': 0,
             'frames_with_face': 0,
@@ -465,7 +466,8 @@ class InterviewSession:
             'total_violations': self.metadata['total_violations'],
             'questions_answered': len(self.answers),
             'current_question': self.current_question,
-            'metadata': self.metadata
+            'metadata': self.metadata,
+            'tab_switches': self.tab_switches
         }
 
 # Global sessions store
@@ -516,7 +518,11 @@ def capture_frame():
         response['reason'] = interview_session.termination_reason
     
     return jsonify(response)
-
+@app.route('/setup_complete', methods=['POST'])
+def setup_complete():
+    """Handle setup completion signal from frontend"""
+    return jsonify({'status': 'success'})
+# ========================================
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
     """Submit answer (audio + metadata)"""
@@ -596,7 +602,23 @@ def results_page():
     return render_template('results.html', 
                          session=interview_session.get_summary(),
                          analysis=analysis)
-
+@app.route('/log_tab_switch', methods=['POST'])
+def log_tab_switch():
+    session_id = session.get('session_id')
+    if not session_id or session_id not in sessions:
+        return jsonify({'error': 'Invalid session'}), 400
+    
+    # Update the count
+    sessions[session_id].tab_switches += 1
+    
+    # Penalty: -2 points for switching tabs
+    sessions[session_id].integrity_score = max(0, sessions[session_id].integrity_score - 2)
+    
+    return jsonify({
+        'status': 'success',
+        'tab_switches': sessions[session_id].tab_switches,
+        'integrity_score': sessions[session_id].integrity_score
+    })
 # ==================== PHASE 2 ANALYSIS ====================
 
 def run_post_interview_analysis(interview_session):
@@ -613,30 +635,38 @@ def run_post_interview_analysis(interview_session):
         'integrity_score': interview_session.integrity_score,
         'questions': [],
         'decision': 'No Hire',
-        'reasons': []
+        'reasons': [],
+        'eye_contact_percentage': 0,
+        'blink_rate': 0
     }
     
     # Analyze each answer
     for answer in interview_session.answers:
-        question = next(q for q in QUESTIONS if q['id'] == answer['question_id'])
-        
+        # Find the question object that matches this answer
+        try:
+            question = next(q for q in QUESTIONS if q['id'] == answer['question_id'])
+        except StopIteration:
+            continue # Skip if question ID not found
+
         question_analysis = {
             'question': question['question'],
-            'transcript': answer['transcript'],
+            'transcript': answer.get('transcript', ''),
             'metrics': {}
         }
         
         # 1. Fluency Analysis
-        if answer['transcript']:
+        if answer.get('transcript'):
             words = answer['transcript'].split()
-            wpm = (len(words) / answer['duration']) * 60 if answer['duration'] > 0 else 0
+            duration = answer.get('duration', 0)
+            wpm = (len(words) / duration) * 60 if duration > 0 else 0
             question_analysis['metrics']['wpm'] = wpm
             question_analysis['metrics']['word_count'] = len(words)
         
         # 2. Answer Accuracy (semantic similarity)
-        if get_model_manager().models.get('sentence') and answer['transcript']:
+        # Check if model exists AND transcript exists
+        if get_model_manager().models.get('sentence') and answer.get('transcript'):
             try:
-                embeddings = get_model_manager.models['sentence'].encode([
+                embeddings = get_model_manager().models['sentence'].encode([
                     question['ideal_answer'],
                     answer['transcript']
                 ])
@@ -646,20 +676,41 @@ def run_post_interview_analysis(interview_session):
                 question_analysis['metrics']['accuracy'] = float(similarity * 100)
             except:
                 question_analysis['metrics']['accuracy'] = 50
+        else:
+            # Default score if model is missing (e.g. Free Tier)
+            question_analysis['metrics']['accuracy'] = 0
         
         results['questions'].append(question_analysis)
     
     # Calculate overall metrics
     if results['questions']:
-        results['fluency'] = np.mean([q['metrics'].get('wpm', 0) for q in results['questions']])
-        results['answer_accuracy'] = np.mean([q['metrics'].get('accuracy', 0) for q in results['questions']])
+        # Filter out 0s to avoid dragging down average if models failed
+        accuracies = [q['metrics'].get('accuracy', 0) for q in results['questions']]
+        results['answer_accuracy'] = np.mean(accuracies) if accuracies else 0
+        
+        wpms = [q['metrics'].get('wpm', 0) for q in results['questions']]
+        results['fluency'] = np.mean(wpms) if wpms else 0
     
-    # Confidence & Nervousness (from frame analysis)
-    frames_with_emotions = [f for f in interview_session.frames if f['face_detected']]
+    # === FIX: Calculate Eye Contact & Blinks ===
+    # Get all frames where a face was actually seen
+    face_frames = [f for f in interview_session.frames if f.get('face_detected')]
+    total_face_frames = len(face_frames)
     
-    # Simplified emotion scores (real implementation would use DeepFace)
-    results['confidence'] = 70 - (len(interview_session.violations) * 5)
-    results['nervousness'] = 30 + (len(interview_session.violations) * 3)
+    if total_face_frames > 0:
+        # Count frames with eye contact
+        eye_contact_count = sum(1 for f in face_frames if f.get('eye_contact'))
+        results['eye_contact_percentage'] = round((eye_contact_count / total_face_frames) * 100, 1)
+        
+        # Count blinks (simple approximation)
+        blink_count = sum(1 for f in face_frames if f.get('blink_detected'))
+        # Approximate blink rate per minute based on session duration
+        duration_min = (time.time() - interview_session.start_time) / 60
+        if duration_min > 0:
+            results['blink_rate'] = round(blink_count / duration_min, 1)
+    
+    # Simplified emotion scores
+    results['confidence'] = max(0, 80 - (len(interview_session.violations) * 5))
+    results['nervousness'] = min(100, 20 + (len(interview_session.violations) * 5))
     
     # Calculate overall score
     results['overall_score'] = (
@@ -685,13 +736,12 @@ def run_post_interview_analysis(interview_session):
     
     if interview_session.status == 'terminated':
         results['decision'] = 'Disqualified'
-        results['reasons'].insert(0, f'Interview terminated: {interview_session.termination_reason}')
+        results['reasons'].insert(0, f'Interview terminated: {getattr(interview_session, "termination_reason", "Unknown reason")}')
     
     if len(interview_session.violations) > 0:
         results['reasons'].append(f'{len(interview_session.violations)} integrity violations detected')
     
     return results
-
 @app.route('/health')
 def health():
     """Health check endpoint for Render"""

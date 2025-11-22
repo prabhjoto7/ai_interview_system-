@@ -291,6 +291,7 @@
     
     var currentQuestion = 0;
     let isRecording = false;
+    var originalInterfaceHTML = '';
     let mediaRecorder = null;
     let videoRecorder = null;
     let audioChunks = [];
@@ -353,6 +354,7 @@
     }
     
     async function init() {
+      originalInterfaceHTML = document.getElementById('questionArea').innerHTML;
       try {
         webcamStream = await navigator.mediaDevices.getUserMedia({ 
           video: { width: 640, height: 480 }, 
@@ -458,6 +460,7 @@
           '<p style="font-size: 1.2em; margin-bottom: 15px;">Your position is perfect. The interview will begin in 3 seconds...</p></div>';
         
         setTimeout(function() {
+          document.getElementById('questionArea').innerHTML = originalInterfaceHTML;
           loadQuestion(0);
           startContinuousCapture();
         }, 3000);
